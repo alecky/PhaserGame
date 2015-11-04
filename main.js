@@ -11,6 +11,8 @@ var mainState = {
         game.load.image('player', 'assets/player.png');
         game.load.image('wallV', 'assets/wallVertical.png');
         game.load.image('wallH', 'assets/wallHorizontal.png');
+        game.load.image('coin', 'assets/coin.png');
+        game.load.image('enemy', 'assets/enemy.png');
     },
     create: function () {
         'use strict';
@@ -27,6 +29,26 @@ var mainState = {
         this.player.body.gravity.y = 500;
         this.cursor = game.input.keyboard.createCursorKeys();
         this.createWorld();
+        
+        // Display the coin
+        this.coin = game.add.sprite(60, 140, 'coin');
+        // Add Arcade physics to the coin
+        game.physics.arcade.enable(this.coin);
+        // Set the anchor point of the coin to its center
+        this.coin.anchor.setTo(0.5, 0.5);
+        // Display the score
+        this.scoreLabel = game.add.text(30, 30, 'score: 0', { font: '18px Arial', fill: '#ffffff' });
+        // Initialise the score variable
+        this.score = 0;
+        
+        // Create an enemy group with Arcade physics
+        this.enemies = game.add.group();
+        this.enemies.enableBody = true;
+        // Create 10 enemies with the 'enemy' image in the group
+        // The enemies are "dead" by default, so they are not visible in the game 
+        this.enemies.createMultiple(10, 'enemy');
+        // Call 'addEnemy' every 2.2 seconds
+        game.time.events.loop(2200, this.addEnemy, this);
     },
     update: function () {
         'use strict';
@@ -38,6 +60,13 @@ var mainState = {
         if (!this.player.inWorld) {
             this.playerDie();
         }
+        game.physics.arcade.overlap(this.player, this.coin, this.takeCoin, null, this);
+        
+        // Make the enemies and walls collide
+        game.physics.arcade.collide(this.enemies, this.walls);
+        
+        // Call the 'playerDie' function when the player and an enemy overlap
+        game.physics.arcade.overlap(this.player, this.enemies, this.playerDie, null, this);
     },
     movePlayer: function () {
         'use strict';
@@ -88,9 +117,62 @@ var mainState = {
     playerDie: function () {
         'use strict';
         game.state.start('main');
+    },
+    
+    takeCoin: function (player, coin) {
+        'use strict';
+        // Increase the score by 5
+        this.score += 5;
+        // Update the score label
+        this.scoreLabel.text = 'score: ' + this.score;
+        
+        // Change the coin position
+        this.updateCoinPosition();
+    },
+    
+    updateCoinPosition: function () {
+        'use strict';
+        // Store all the possible coin positions in an array 
+        var coinPosition = [
+            {x: 140, y: 60}, {x: 360, y: 60}, // Top row 
+            {x: 60, y: 140}, {x: 440, y: 140}, // Middle row 
+            {x: 130, y: 300}, {x: 370, y: 300} // Bottom row
+        ], i, newPosition;
+        
+        // Remove the current coin position from the array
+        // Otherwise the coin could appear at the same spot twice in a row 
+        for (i = 0; i < coinPosition.length; i += 1) {
+            if (coinPosition[i].x === this.coin.x) {
+                coinPosition.splice(i, 1);
+            }
+        }
+          
+        // Randomly select a position from the array
+        newPosition = coinPosition[game.rnd.integerInRange(0, coinPosition.length - 1)];
+          
+        // Set the new position of the coin
+        this.coin.reset(newPosition.x, newPosition.y);
+    },
+    
+    addEnemy: function () {
+        'use strict';
+        // Get the first dead enemy of the group 
+        var enemy = this.enemies.getFirstDead();
+        
+        // If there isn't any dead enemy, do nothing
+        if (!enemy) {
+            return;
+        }
+        
+        // Initialise the enemy
+        enemy.anchor.setTo(0.5, 1);
+        enemy.reset(game.world.centerX, 0);
+        enemy.body.gravity.y = 500;
+        enemy.body.velocity.x = 100 * Phaser.Math.randomSign();
+        enemy.body.bounce.x = 1;
+        enemy.checkWorldBounds = true;
+        enemy.outOfBoundsKill = true;
     }
-
-    // And here we will later add some of our own functions
 };
 
 // Add the 'mainState' to Phaser, and call it 'main'
